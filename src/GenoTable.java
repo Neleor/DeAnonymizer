@@ -3,10 +3,12 @@ import java.io.*;
 import java.nio.file.*;
 import java.util.*;
 
+
 import org.molgenis.genotype.Allele;
 import org.molgenis.genotype.variant.*;
 import org.molgenis.genotype.RandomAccessGenotypeData;
 import org.molgenis.genotype.RandomAccessGenotypeDataReaderFormats;
+import org.molgenis.genotype.util.ProbabilitiesConvertor;
 
 
 // To get the "genoCode" from a bam file: change the fillHelper function
@@ -23,9 +25,9 @@ public class GenoTable
     private boolean d_loopOverAllChr;
     
     private RandomAccessGenotypeData d_dnaGenotypes; 
-    private Hashtable<String, Scores> d_genoTable;
+    private HashMap<String, Scores> d_genoTable;
     private double[] d_alphas;
-    private Hashtable<String, double[]> d_doublets;
+    private HashMap<String, double[]> d_doublets;
     private int d_tVal; // Cut-off value for (doublet - singlet) likelihoods
 	
     public GenoTable(String genoVCF, String SNPfile, String cellNameFile, boolean allChr, int alpha, int tVal)
@@ -75,8 +77,8 @@ public class GenoTable
 		System.out.println("The number of samples in the DNA genotypes is: " + d_numbSamples);
 		
 		// Make hashtable, for each cell a list of d_numbSamples scores
-		d_genoTable = new Hashtable<String, Scores>();
-		d_doublets = new Hashtable<String, double[]>();
+		d_genoTable = new HashMap<>();
+		d_doublets = new HashMap<>();
 		
 		// Read cell names
 		try
@@ -93,7 +95,6 @@ public class GenoTable
 		catch(IOException ex) 
 		{
 			System.err.println("Error reading cell name file (from the -n option).\n");
-			throw (ex);
 		}
     }
     
@@ -161,16 +162,64 @@ public class GenoTable
     	int[] genoCode = new int[4]; // in alphabetic order: A, C, G, T
     	String cell_id;
     	
+    	
+    	// When reading from bam file
+//    	for(GeneticVariant snp : d_dnaGenotypes)
+//    	{
+//    		// do check if variant should be considered: isSNP, isBiallelic, has genotypes for all samples
+//    		if (!snp.isSnp())
+//        		continue;
+//    		
+//    		if (!snp.isBiallelic())
+//        		continue;
+//        
+//        	Allele ref = snp.getRefAllele();
+//        	Allele alt = snp.getAlternativeAlleles().get(0);
+//    		float[][] snpGP = snp.getSampleGenotypeProbilities();
+//
+//    		// Check that all samples have the GP field filled
+//    		boolean allFilled = true;
+//    		for (int samp = 0; samp < d_numbSamples; ++samp)
+//    		{
+//    			if (snpGP[samp][0] + snpGP[samp][1] + snpGP[samp][2] < 0.99)  // allow rounding-off error
+//    			{	
+//    				if (d_dnaGenotypes.getSampleNames()[samp].contains("gonl"))
+//    				{
+//    					float[][] thisGP = ProbabilitiesConvertor.convertCalledAllelesToProbability(snp.getSampleVariants().subList(samp, samp + 1), snp.getVariantAlleles());
+//    					for (int idx = 0; idx < 3; ++idx)
+//    					{
+//    						snpGP[samp][idx] = thisGP[0][idx];
+//    					}
+//    				}
+//    				else
+//    					allFilled = false;
+//    			}
+//    						
+//    		}
+//
+//    		if (!allFilled)
+//    			continue;
+//    		
+//    		// if so, determine reads per cell at variant in bam file
+//    		
+//    		
+//    		// 
+//    	}
+    		
     	// parse line from d_SNPfile, get pos, cell_id and reads for the alleles
     	BufferedReader reader = null;
     	try {
     		String curLine;
     		reader = new BufferedReader(new FileReader(d_SNPfile));
     		int processedlines = 0;
+
+    		// Old way of reading file, adapt
+    		
+    		
     		while ((curLine = reader.readLine()) != null)
     		{
     			String[] strArr = curLine.split("\t");
-    			if (!strArr[0].equals("CHROM"))
+    			if (!strArr[0].equals("CHROM")) // has to check every line again
     			{	
     				d_chr = strArr[0];
 	    			cell_id = strArr[4];
@@ -217,8 +266,8 @@ public class GenoTable
     		return;
 
     	GeneticVariant snp = d_dnaGenotypes.getSnpVariantByPos(d_chr,pos);
-    	
-    	if (!(snp != null))
+
+    	if (snp == null)
     		return; 
     	
     	if (!snp.isBiallelic())
@@ -230,18 +279,24 @@ public class GenoTable
 		float[][] snpGP = snp.getSampleGenotypeProbilities();
 
 		// Check that all samples have the GP field filled
-		boolean allFilled = true;
 		for (int samp = 0; samp < d_numbSamples; ++samp)
 		{
-			if (snpGP[samp][0] + snpGP[samp][1] + snpGP[samp][2] < 1.0)
-				allFilled = false;
+			if (snpGP[samp][0] + snpGP[samp][1] + snpGP[samp][2] < 0.99)  // allow rounding-off error
+			{	
+				if (d_dnaGenotypes.getSampleNames()[samp].contains("gonl"))
+				{
+					float[][] thisGP = ProbabilitiesConvertor.convertCalledAllelesToProbability(snp.getSampleVariants().subList(samp, samp + 1), snp.getVariantAlleles());
+					for (int idx = 0; idx < 3; ++idx)
+					{
+						snpGP[samp][idx] = thisGP[0][idx];
+					}
+				}
+				else
+					return;
+			}
+						
 		}
-		
-		if (!allFilled)
-			return;
-		
-		// If you have to convert PL to GP? Need MAF?
-		//double maf = snp.getMinorAlleleFrequency();
+
 		
 		// Do comparison (in class SNPCompare)
 		SNPCompare comp = new SNPCompare(genoCode, snpGP, ref, alt, d_numbSamples, d_alphas);
@@ -255,6 +310,7 @@ public class GenoTable
 		score.addScores(result);
 		score.increaseNSnps();
 		
+		// Niet nodig
 		d_genoTable.put(cell_id, score);
 		
 		
@@ -370,12 +426,13 @@ public class GenoTable
         // Assuming a unique maximum...
     	double max = doubs[0];
         int maxAt = 0;
-        for (int ktr = 0; ktr < doubs.length; ++ktr) {
-            if (doubs[ktr] > max) {
-                max = doubs[ktr];
-                maxAt = ktr;
+        for (int idx = 0; idx < doubs.length; ++idx) {
+            if (doubs[idx] > max) {
+                max = doubs[idx];
+                maxAt = idx;
             }
         }
+
         return maxAt;
     }
      
