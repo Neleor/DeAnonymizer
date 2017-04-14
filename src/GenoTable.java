@@ -43,7 +43,7 @@ public class GenoTable
     private void parseAlpha(int alpha)
     {
     	if (alpha == 1)
-    		d_alphas = new double[] {0.5};
+    		d_alphas = new double[] {0.50};
     	else if (alpha == 3)
     		d_alphas = new double[] {0.10, 0.20, 0.30, 0.40, 0.50, 0.60, 0.70, 0.80, 0.90};
     	else if (alpha == 4)
@@ -76,7 +76,7 @@ public class GenoTable
 		d_numbSamples = d_dnaGenotypes.getSampleNames().length;
 		System.out.println("The number of samples in the DNA genotypes is: " + d_numbSamples);
 		
-		// Make hashtable, for each cell a list of d_numbSamples scores
+		// Make hashmap, for each cell a list of d_numbSamples scores
 		d_genoTable = new HashMap<>();
 		d_doublets = new HashMap<>();
 		
@@ -378,17 +378,13 @@ public class GenoTable
     	try{
     	    PrintWriter writer = new PrintWriter(outputPath, "UTF-8");
 
-    	    //writer.println("\t" + Arrays.toString(d_dnaGenotypes.getSampleNames()).replaceAll("[\\[ | \\]]", "").replaceAll(",", "\t") + "\t" + "nSNPs_tested");
-    	    writer.println("cell_id\tSinglet_samp\tDoub_samp1\tDoub_samp2\talpha\tllkDoublet-llkSinglet\tllkDoublet\tllkSingletSamp1\tllkSingletSamp2\tnSNPs_tested\toutcome\tassigned_sample(s)");
+     	    writer.println("cell_id\tSinglet_samp\tDoub_samp1\tDoub_samp2\talpha\tllkDoublet-llkSinglet\tllkDoublet\tllkSingletSamp1\tllkSingletSamp2\tnSNPs_tested\toutcome\tassigned_sample(s)");
     	    
     	    for (String cell_id : Files.readAllLines(Paths.get(d_cellNames))) 
     		{
-    	    	//int maxAt = maxValueAt(d_genoTable.get(fline).getScores());
-    	    	//writer.println(fline + "\t" + Arrays.toString(d_genoTable.get(fline).getScores()).replaceAll("[\\[ | \\]]", "").replaceAll(",", "\t") + "\t" + d_genoTable.get(fline).getNSnps() + "\t" + d_dnaGenotypes.getSampleNames()[maxAt]);
-    	    	//writer.println(fline + "\t" + Arrays.toString(d_doublets.get(fline)).replaceAll("[\\[ | \\]]", "").replaceAll(",", "\t") + "\t");
     	    	int maxDoubAt = maxValueAt(d_doublets.get(cell_id));
     	    	
-    	    	int combi = maxDoubAt / (d_alphas.length);
+    	    	int combi = maxDoubAt / (d_alphas.length); 
     	    	int alpha = maxDoubAt - (d_alphas.length) * (maxDoubAt / (d_alphas.length));
     	    	int maxCellAt = maxValueAt(d_genoTable.get(cell_id).getScores());
     	    	    	

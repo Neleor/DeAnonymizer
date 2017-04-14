@@ -9,9 +9,9 @@ public class SNPCompare {
 	private float[][] d_snpGP;
 	private Allele d_ref;
 	private Allele d_alt;
-	//private double[] d_alphas = {0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9}; // step size of alpha (take values such that 1/alphaStep = INTEGER)
 	private double[] d_alphas; 
 	private boolean d_goodSNP = true;
+	private double d_error = 0.03;
 	
 	public SNPCompare(int[] genoCode, float[][] snpGP, Allele ref, Allele alt, int numbSamples, double[] alphas)
 	{
@@ -58,13 +58,13 @@ public class SNPCompare {
 			if (n_ref + n_alt == 0)
 				continue; 
 			
-			double pRRr = 0.999 * d_snpGP[samp][0];  // (P(R|RR,0)*gp(RR)+P(R|RR,1)*gp(RR))
-			double pRAr = 0.999 * 0.5 * d_snpGP[samp][1] + 0.001 * d_snpGP[samp][1] / 6.0;
-			double pAAr = 0.001 * d_snpGP[samp][2] / 3.0; 
+			double pRRr = (1 - d_error) * d_snpGP[samp][0];  // (P(R|RR,0)*gp(RR)+P(R|RR,1)*gp(RR))
+			double pRAr = (1 - d_error) * 0.5 * d_snpGP[samp][1] + d_error * d_snpGP[samp][1] / 6.0;
+			double pAAr = d_error * d_snpGP[samp][2] / 3.0; 
 
-			double pRRa = 0.001 * d_snpGP[samp][0] / 3.0;
-			double pRAa = 0.999 * 0.5 * d_snpGP[samp][1] + 0.001 * d_snpGP[samp][1] / 6.0;
-			double pAAa = 0.999 * d_snpGP[samp][2];
+			double pRRa = d_error * d_snpGP[samp][0] / 3.0;
+			double pRAa = (1 - d_error) * 0.5 * d_snpGP[samp][1] + d_error * d_snpGP[samp][1] / 6.0;
+			double pAAa = (1 - d_error) * d_snpGP[samp][2];
 			
 			double tmp;
 			if (n_ref > 0 && n_alt > 0)
@@ -74,10 +74,8 @@ public class SNPCompare {
 			else 
 				tmp = Math.pow(pRRa, n_alt) + Math.pow(pRAa, n_alt) + Math.pow(pAAa, n_alt);
 
-			
-			//System.out.println(n_ref + "\t" + n_alt + "\t" + d_snpGP[samp][0] + "\t" + d_snpGP[samp][1] + "\t" + d_snpGP[samp][2] + "\t" + tmp);
-			
-			// Subtract the maximum logarithm from all logs?
+		
+			// Avoid taking the logarithm of too small values, as this will result in -INF. Instead, discard this SNP
 			if (tmp < 1e-300)
 				d_goodSNP = false; 
 			
@@ -85,7 +83,6 @@ public class SNPCompare {
 			
 		}
 		
-		// Avoid taking the logarithm of too small values, as this will result in -INF. Instead, discard this SNP
 	}
 	
 
@@ -98,6 +95,7 @@ public class SNPCompare {
 			return;
 		
 		int combTested = 0;
+
 		
 		for (int samp1 = 0; samp1 < d_numbSamples; ++samp1)
 		{
@@ -109,27 +107,28 @@ public class SNPCompare {
 				{
 					double alpha = d_alphas[alphaInt];
 
+					
 					// The first number represents the genotype of samp1, second number = genotype samp 2, the letter refers to the observed allele (alt or ref)
-					double p00r = (0.999) * d_snpGP[samp1][0] * d_snpGP[samp2][0];
-					double p01r = ((1 - alpha) * 0.999 + alpha * (0.999 * 0.5 + 0.001 / 6.0)) * d_snpGP[samp1][0] * d_snpGP[samp2][1];
-					double p02r = ((1 - alpha) * 0.999 + alpha * (0.001 / 3.0)) 			  * d_snpGP[samp1][0] * d_snpGP[samp2][2];
-					double p10r = ((1 - alpha) * (0.999 * 0.5 + 0.001 / 6.0) + alpha * 0.999) * d_snpGP[samp1][1] * d_snpGP[samp2][0];
-					double p11r = ((0.999 * 0.5 + 0.001 / 6.0)) 								* d_snpGP[samp1][1] * d_snpGP[samp2][1];
-					double p12r = ((1 - alpha) * (0.999 * 0.5 + 0.001 / 6.0) + alpha * (0.001 / 3.0)) * d_snpGP[samp1][1] * d_snpGP[samp2][2];
-					double p20r = ((1 - alpha) * (0.001 / 3.0) + alpha * 0.999) 					  * d_snpGP[samp1][2] * d_snpGP[samp2][0];
-					double p21r = ((1 - alpha) * (0.001 / 3.0) + alpha * (0.999 * 0.5 + 0.001 / 6.0)) * d_snpGP[samp1][2] * d_snpGP[samp2][1];
-					double p22r = (0.001 / 3.0) * d_snpGP[samp1][2] * d_snpGP[samp2][2];
+					double p00r = (1 - d_error) * d_snpGP[samp1][0] * d_snpGP[samp2][0];
+					double p01r = ((1 - alpha) * (1 - d_error) + alpha * ((1 - d_error) * 0.5 + d_error / 6.0)) * d_snpGP[samp1][0] * d_snpGP[samp2][1];
+					double p02r = ((1 - alpha) * (1 - d_error) + alpha * (d_error / 3.0)) 			  * d_snpGP[samp1][0] * d_snpGP[samp2][2];
+					double p10r = ((1 - alpha) * ((1 - d_error) * 0.5 + d_error / 6.0) + alpha * (1 - d_error)) * d_snpGP[samp1][1] * d_snpGP[samp2][0];
+					double p11r = (((1 - d_error) * 0.5 + d_error / 6.0)) 								* d_snpGP[samp1][1] * d_snpGP[samp2][1];
+					double p12r = ((1 - alpha) * ((1 - d_error) * 0.5 + d_error / 6.0) + alpha * (d_error / 3.0)) * d_snpGP[samp1][1] * d_snpGP[samp2][2];
+					double p20r = ((1 - alpha) * (d_error / 3.0) + alpha * (1 - d_error)) 					  * d_snpGP[samp1][2] * d_snpGP[samp2][0];
+					double p21r = ((1 - alpha) * (d_error / 3.0) + alpha * ((1 - d_error) * 0.5 + d_error / 6.0)) * d_snpGP[samp1][2] * d_snpGP[samp2][1];
+					double p22r = (d_error / 3.0) * d_snpGP[samp1][2] * d_snpGP[samp2][2];
 
 					
-					double p00a =  (0.001 / 3.0) 													   * d_snpGP[samp1][0] * d_snpGP[samp2][0];
-					double p01a =  ((1 - alpha) * (0.001 / 3.0) + alpha * (0.999 * 0.5 + 0.001 / 6.0)) * d_snpGP[samp1][0] * d_snpGP[samp2][1];
-					double p02a =  ((1 - alpha) * (0.001 / 3.0) + alpha * 0.999) 					   * d_snpGP[samp1][0] * d_snpGP[samp2][2];
-					double p10a =  ((1 - alpha) * (0.999 * 0.5 + 0.001 / 6.0) + alpha * (0.001 / 3.0)) * d_snpGP[samp1][1] * d_snpGP[samp2][0];
-					double p11a =  ((0.999 * 0.5 + 0.001 / 6.0)) 									   * d_snpGP[samp1][1] * d_snpGP[samp2][1];
-					double p12a =  ((1 - alpha) * (0.999 * 0.5 + 0.001 / 6.0) + alpha * 0.999) 		   * d_snpGP[samp1][1] * d_snpGP[samp2][2];
-					double p20a =  ((1 - alpha) * 0.999 + alpha * (0.001 / 3.0)) 					   * d_snpGP[samp1][2] * d_snpGP[samp2][0];
-					double p21a =  ((1 - alpha) * 0.999 + alpha * (0.999 * 0.5 + 0.001 / 6.0)) 		   * d_snpGP[samp1][2] * d_snpGP[samp2][1];
-					double p22a =  (0.999) 															   * d_snpGP[samp1][2] * d_snpGP[samp2][2];
+					double p00a =  (d_error / 3.0) 	* d_snpGP[samp1][0] * d_snpGP[samp2][0];
+					double p01a =  ((1 - alpha) * (d_error / 3.0) + alpha * ((1 - d_error) * 0.5 + d_error / 6.0)) * d_snpGP[samp1][0] * d_snpGP[samp2][1];
+					double p02a =  ((1 - alpha) * (d_error / 3.0) + alpha * (1 - d_error)) 					   	   * d_snpGP[samp1][0] * d_snpGP[samp2][2];
+					double p10a =  ((1 - alpha) * ((1 - d_error) * 0.5 + d_error / 6.0) + alpha * (d_error / 3.0)) * d_snpGP[samp1][1] * d_snpGP[samp2][0];
+					double p11a =  (((1 - d_error) * 0.5 + d_error / 6.0)) 									   	   * d_snpGP[samp1][1] * d_snpGP[samp2][1];
+					double p12a =  ((1 - alpha) * ((1 - d_error) * 0.5 + d_error / 6.0) + alpha * (1 - d_error))   * d_snpGP[samp1][1] * d_snpGP[samp2][2];
+					double p20a =  ((1 - alpha) * (1 - d_error) + alpha * (d_error / 3.0)) 					  	   * d_snpGP[samp1][2] * d_snpGP[samp2][0];
+					double p21a =  ((1 - alpha) * (1 - d_error) + alpha * ((1 - d_error) * 0.5 + d_error / 6.0))   * d_snpGP[samp1][2] * d_snpGP[samp2][1];
+					double p22a =  ((1 - d_error)) * d_snpGP[samp1][2] * d_snpGP[samp2][2];
 					
 					double tmp = Math.pow(p00r, n_ref) * Math.pow(p00a, n_alt) +
 							Math.pow(p01r, n_ref) * Math.pow(p01a, n_alt) +
