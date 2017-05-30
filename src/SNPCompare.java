@@ -11,9 +11,9 @@ public class SNPCompare {
 	private Allele d_alt;
 	private double[] d_alphas; 
 	private boolean d_goodSNP = true;
-	private double d_error = 0.03;
+	private double d_error;
 	
-	public SNPCompare(int[] genoCode, float[][] snpGP, Allele ref, Allele alt, int numbSamples, double[] alphas)
+	public SNPCompare(int[] genoCode, float[][] snpGP, Allele ref, Allele alt, int numbSamples, double[] alphas, double error)
 	{
 		d_genoCode = genoCode;
 		d_numbSamples = numbSamples;
@@ -22,7 +22,8 @@ public class SNPCompare {
 		d_doublets = new double[d_numbSamples * (d_numbSamples - 1) / 2 * d_alphas.length];
 		d_snpGP = snpGP;
 		d_ref = ref;
-		d_alt = alt;	
+		d_alt = alt;
+		d_error = error;
 	}
 	
 	public double[] run()
@@ -58,23 +59,20 @@ public class SNPCompare {
 			if (n_ref + n_alt == 0)
 				continue; 
 			
-			double pRRr = (1 - d_error) * d_snpGP[samp][0];  // (P(R|RR,0)*gp(RR)+P(R|RR,1)*gp(RR))
-			double pRAr = (1 - d_error) * 0.5 * d_snpGP[samp][1] + d_error * d_snpGP[samp][1] / 6.0;
-			double pAAr = d_error * d_snpGP[samp][2] / 3.0; 
+			// The number represents the genotype of samp, the letter refers to the allele (r = ref, a = alt)
+			// So, p2r means: P(ref allele | genotype samp = 1/1) (then the observed ref allele is supposed to be a mistake)
+			double p0r = (1 - d_error) 						   * d_snpGP[samp][0];  
+			double p1r = ((1 - d_error) * 0.5 + d_error / 6.0) * d_snpGP[samp][1] ;
+			double p2r = d_error / 3.0 					       * d_snpGP[samp][2]; 
 
-			double pRRa = d_error * d_snpGP[samp][0] / 3.0;
-			double pRAa = (1 - d_error) * 0.5 * d_snpGP[samp][1] + d_error * d_snpGP[samp][1] / 6.0;
-			double pAAa = (1 - d_error) * d_snpGP[samp][2];
+			double p0a = d_error / 3.0 					       * d_snpGP[samp][0];
+			double p1a = ((1 - d_error) * 0.5 + d_error / 6.0) * d_snpGP[samp][1];
+			double p2a = (1 - d_error) 						   * d_snpGP[samp][2];
 			
 			double tmp;
-			if (n_ref > 0 && n_alt > 0)
-				tmp = Math.pow(pRRa, n_alt) * Math.pow(pRRr, n_ref) + Math.pow(pRAa, n_alt) * Math.pow(pRAr, n_ref) + Math.pow(pAAa, n_alt) * Math.pow(pAAr, n_ref);
-			else if (n_ref > 0)
-				tmp = Math.pow(pRRr, n_ref) + Math.pow(pRAr, n_ref) + Math.pow(pAAr, n_ref);
-			else 
-				tmp = Math.pow(pRRa, n_alt) + Math.pow(pRAa, n_alt) + Math.pow(pAAa, n_alt);
 
-		
+			tmp = Math.pow(p0a, n_alt) * Math.pow(p0r, n_ref) + Math.pow(p1a, n_alt) * Math.pow(p1r, n_ref) + Math.pow(p2a, n_alt) * Math.pow(p2r, n_ref);
+	
 			// Avoid taking the logarithm of too small values, as this will result in -INF. Instead, discard this SNP
 			if (tmp < 1e-300)
 				d_goodSNP = false; 
@@ -108,19 +106,20 @@ public class SNPCompare {
 					double alpha = d_alphas[alphaInt];
 
 					
-					// The first number represents the genotype of samp1, second number = genotype samp 2, the letter refers to the observed allele (alt or ref)
-					double p00r = (1 - d_error) * d_snpGP[samp1][0] * d_snpGP[samp2][0];
-					double p01r = ((1 - alpha) * (1 - d_error) + alpha * ((1 - d_error) * 0.5 + d_error / 6.0)) * d_snpGP[samp1][0] * d_snpGP[samp2][1];
-					double p02r = ((1 - alpha) * (1 - d_error) + alpha * (d_error / 3.0)) 			  * d_snpGP[samp1][0] * d_snpGP[samp2][2];
-					double p10r = ((1 - alpha) * ((1 - d_error) * 0.5 + d_error / 6.0) + alpha * (1 - d_error)) * d_snpGP[samp1][1] * d_snpGP[samp2][0];
-					double p11r = (((1 - d_error) * 0.5 + d_error / 6.0)) 								* d_snpGP[samp1][1] * d_snpGP[samp2][1];
+					// The first number represents the genotype of samp1, second number is genotype samp2, the letter refers to the observed allele (r = ref, a = alt)
+					// So, p01r means: P(ref allele | genotype samp1 = 0/0 and genotype samp2 = 0/1)
+					double p00r = (1 - d_error) 							                                      * d_snpGP[samp1][0] * d_snpGP[samp2][0];
+					double p01r = ((1 - alpha) * (1 - d_error) + alpha * ((1 - d_error) * 0.5 + d_error / 6.0))   * d_snpGP[samp1][0] * d_snpGP[samp2][1];
+					double p02r = ((1 - alpha) * (1 - d_error) + alpha * (d_error / 3.0)) 			  			  * d_snpGP[samp1][0] * d_snpGP[samp2][2];
+					double p10r = ((1 - alpha) * ((1 - d_error) * 0.5 + d_error / 6.0) + alpha * (1 - d_error))   * d_snpGP[samp1][1] * d_snpGP[samp2][0];
+					double p11r = (((1 - d_error) * 0.5 + d_error / 6.0)) 										  * d_snpGP[samp1][1] * d_snpGP[samp2][1];
 					double p12r = ((1 - alpha) * ((1 - d_error) * 0.5 + d_error / 6.0) + alpha * (d_error / 3.0)) * d_snpGP[samp1][1] * d_snpGP[samp2][2];
-					double p20r = ((1 - alpha) * (d_error / 3.0) + alpha * (1 - d_error)) 					  * d_snpGP[samp1][2] * d_snpGP[samp2][0];
+					double p20r = ((1 - alpha) * (d_error / 3.0) + alpha * (1 - d_error)) 						  * d_snpGP[samp1][2] * d_snpGP[samp2][0];
 					double p21r = ((1 - alpha) * (d_error / 3.0) + alpha * ((1 - d_error) * 0.5 + d_error / 6.0)) * d_snpGP[samp1][2] * d_snpGP[samp2][1];
-					double p22r = (d_error / 3.0) * d_snpGP[samp1][2] * d_snpGP[samp2][2];
+					double p22r = (d_error / 3.0) 																  * d_snpGP[samp1][2] * d_snpGP[samp2][2];
 
 					
-					double p00a =  (d_error / 3.0) 	* d_snpGP[samp1][0] * d_snpGP[samp2][0];
+					double p00a =  (d_error / 3.0) 																   * d_snpGP[samp1][0] * d_snpGP[samp2][0];
 					double p01a =  ((1 - alpha) * (d_error / 3.0) + alpha * ((1 - d_error) * 0.5 + d_error / 6.0)) * d_snpGP[samp1][0] * d_snpGP[samp2][1];
 					double p02a =  ((1 - alpha) * (d_error / 3.0) + alpha * (1 - d_error)) 					   	   * d_snpGP[samp1][0] * d_snpGP[samp2][2];
 					double p10a =  ((1 - alpha) * ((1 - d_error) * 0.5 + d_error / 6.0) + alpha * (d_error / 3.0)) * d_snpGP[samp1][1] * d_snpGP[samp2][0];
@@ -128,7 +127,7 @@ public class SNPCompare {
 					double p12a =  ((1 - alpha) * ((1 - d_error) * 0.5 + d_error / 6.0) + alpha * (1 - d_error))   * d_snpGP[samp1][1] * d_snpGP[samp2][2];
 					double p20a =  ((1 - alpha) * (1 - d_error) + alpha * (d_error / 3.0)) 					  	   * d_snpGP[samp1][2] * d_snpGP[samp2][0];
 					double p21a =  ((1 - alpha) * (1 - d_error) + alpha * ((1 - d_error) * 0.5 + d_error / 6.0))   * d_snpGP[samp1][2] * d_snpGP[samp2][1];
-					double p22a =  ((1 - d_error)) * d_snpGP[samp1][2] * d_snpGP[samp2][2];
+					double p22a =  ((1 - d_error)) 																   * d_snpGP[samp1][2] * d_snpGP[samp2][2];
 					
 					double tmp = Math.pow(p00r, n_ref) * Math.pow(p00a, n_alt) +
 							Math.pow(p01r, n_ref) * Math.pow(p01a, n_alt) +
@@ -139,12 +138,7 @@ public class SNPCompare {
 							Math.pow(p20r, n_ref) * Math.pow(p20a, n_alt) +
 							Math.pow(p21r, n_ref) * Math.pow(p21a, n_alt) +
 							Math.pow(p22r, n_ref) * Math.pow(p22a, n_alt);
-					//if (alpha == 0.5 && samp1 == 0 && samp2 == 1)
-					//{
-					//	System.out.println(alpha + "\t" + n_ref + "\t" + n_alt + "\tSample:" + samp1 + "\t" + d_snpGP[samp1][0] + "\t" + d_snpGP[samp1][1] + "\t" + d_snpGP[samp1][2]);
-					//	System.out.println(alpha + "\t" + n_ref + "\t" + n_alt + "\tSample:" + samp2 + "\t" + d_snpGP[samp2][0] + "\t" + d_snpGP[samp2][1] + "\t" + d_snpGP[samp2][2]);
-					//	System.out.println("\t" + tmp);
-					//}
+
 					
 					if (tmp < 1e-300)
 						d_goodSNP = false; 

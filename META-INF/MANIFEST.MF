@@ -1,9 +1,0 @@
-Manifest-Version: 1.0
-Implementation-Vendor: com.github.samtools
-Implementation-Title: htsjdk
-Implementation-Version: 1.129
-Implementation-Vendor-Id: com.github.samtools
-Specification-Vendor: com.github.samtools
-Specification-Title: htsjdk
-Specification-Version: 1.129
-

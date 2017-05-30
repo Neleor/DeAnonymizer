@@ -1,4 +1,3 @@
-
 public class Scores {
 	
 	private double[] d_scores;
