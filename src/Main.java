@@ -7,7 +7,7 @@ import org.apache.commons.cli.*;
  * Main class for DeAnonymizer
  *
  * @author Marion Dam
- * @version 1.0
+ * @version 1.1
  * 
  * The likelihood (as computed in SNPcompare class) is described in:
  * Multiplexing droplet-based single cell RNA-sequencing using natural genetic barcodes, H.M. Kang e.a., biorxiv preprint
@@ -27,7 +27,9 @@ public class Main
 	    options.addOption("a", "alpha", true, "OPTIONAL. Integer from 1 to 4, where: \t1: {0.5}, \t2: {0.25, 0.5, 0.75}, \t3: {0.10, 0.20, ..., 0.90}. \t4: {0.05, 0.10, ..., 0.95}, \tDefault = 1.");
 	    options.addOption("t", "tValCutoff", true, "OPTIONAL. Set cut-off for log-likelihood difference (integer). \tDefault = 1.");
 	    options.addOption("e", "error", true, "OPTIONAL. Set error in base quality. \tDefault = 0.001.");
+	    options.addOption("S", "samples", true, "OPTIONAL. Text file to specify which samples in the VCF to be included, one sample name per line. \tDefault = ALL samples in VCF.");
 
+	    
 	    CommandLineParser parser = new DefaultParser();
 	        
 	    try 
@@ -48,6 +50,11 @@ public class Main
             String cellNameFile = line.getOptionValue("n");
             String outputPath = line.getOptionValue("o");
             
+            
+            String sampleFile = null;
+            if (line.hasOption("S"))
+            	sampleFile = line.getOptionValue("S");
+            
             int alpha = 1;
             if(line.hasOption("a"))
             	alpha = Integer.parseInt(line.getOptionValue("a"));
@@ -65,7 +72,7 @@ public class Main
             
             GenoTable genoTable;
 
-	        genoTable = new GenoTable(genoVCF, SNPfile, cellNameFile, alpha, tVal, error);
+	        genoTable = new GenoTable(genoVCF, SNPfile, cellNameFile, alpha, tVal, error, sampleFile);
 	        genoTable.run(); 
 
             genoTable.writeTable(outputPath);

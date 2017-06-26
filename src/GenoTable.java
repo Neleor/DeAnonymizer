@@ -8,12 +8,15 @@ import org.molgenis.genotype.Allele;
 import org.molgenis.genotype.variant.*;
 import org.molgenis.genotype.RandomAccessGenotypeData;
 import org.molgenis.genotype.RandomAccessGenotypeDataReaderFormats;
+import org.molgenis.genotype.sampleFilter.SampleFilterableGenotypeDataDecorator;
+import org.molgenis.genotype.sampleFilter.SampleFilter;
+import org.molgenis.genotype.sampleFilter.SampleIdIncludeFilter;
 import org.molgenis.genotype.util.ProbabilitiesConvertor;
 
 
 /**
  * @author Marion Dam
- * @version 1.0
+ * @version 1.1
  */
 public class GenoTable 
 {
@@ -21,6 +24,7 @@ public class GenoTable
 	private String d_SNPfile;
     private String d_cellNames;
     private String d_chr = "1";
+    private String d_sampleFile;
     
     private int d_numbSamples;
     private int d_numbCells;
@@ -31,15 +35,18 @@ public class GenoTable
     private HashMap<String, double[]> d_doublets;
     private int d_tVal; // Cut-off value for (doublet - singlet) likelihoods
 	private double d_error;
-    
-    public GenoTable(String genoVCF, String SNPfile, String cellNameFile, int alpha, int tVal, double error)
+
+	
+    public GenoTable(String genoVCF, String SNPfile, String cellNameFile, int alpha, int tVal, double error, String sampleFile)
     {
     	d_genoVCF = genoVCF;
     	d_SNPfile = SNPfile;
     	d_cellNames = cellNameFile;
     	d_tVal = tVal;
     	d_error = error;
+    	d_sampleFile = sampleFile;
     	parseAlpha(alpha);
+  
     }
     
     private void parseAlpha(int alpha)
@@ -63,7 +70,7 @@ public class GenoTable
     private void createTable() throws IOException
     {
     	// Read DNA Genotypes
-		try 
+    	try 
 		{
 			d_dnaGenotypes = RandomAccessGenotypeDataReaderFormats.VCF.createGenotypeData(d_genoVCF);
 			
@@ -74,8 +81,40 @@ public class GenoTable
 			throw (ex);
 		}
 		
-		d_numbSamples = d_dnaGenotypes.getSampleNames().length;
-		System.out.println("The number of samples in the DNA genotypes is: " + d_numbSamples);
+		
+		if (d_sampleFile == null)
+		{
+			d_numbSamples = d_dnaGenotypes.getSampleNames().length;
+		}
+		else
+		{
+			HashSet<String> includedSamples = new HashSet<String>();
+			
+	    	try (BufferedReader reader = new BufferedReader(new FileReader(d_sampleFile))){
+	    		String curLine;
+	    		while ((curLine = reader.readLine()) != null)
+	    		{
+	    			includedSamples.add(curLine);  			
+	    		}
+	    	}
+	    	catch (IOException e) {
+	    		System.err.println("Error reading sample file (from the -S option).\n");
+	    		e.printStackTrace();
+	        } 
+			
+	    	//Filter the data with the selected variants to only include the selected samples
+			SampleFilter sampleFilter = new SampleIdIncludeFilter(includedSamples);
+			d_dnaGenotypes = new SampleFilterableGenotypeDataDecorator(d_dnaGenotypes, sampleFilter);
+			
+			d_numbSamples = d_dnaGenotypes.getSampleNames().length;			
+		}
+
+		System.out.println("The number of samples in the DNA genotypes is: " + d_numbSamples + "\n\nThe following samples are included:");						
+
+		for (int idx = 0; idx < d_numbSamples; ++idx)
+		{
+			System.out.println(idx + "\t" + d_dnaGenotypes.getSampleNames()[idx]);
+		}
 		
 		// Make hashmap, for each cell a list of d_numbSamples scores
 		d_genoTable = new HashMap<>();
@@ -91,7 +130,7 @@ public class GenoTable
 
 			}
 			d_numbCells = d_genoTable.size();
-			System.out.println("The number of cell barcodes is: " + d_numbCells + "\n");
+			System.out.println("\nThe number of cell barcodes is: " + d_numbCells + "\n");
 		}
 		catch(IOException ex) 
 		{
@@ -105,51 +144,7 @@ public class GenoTable
     	int pos;
     	int[] genoCode = new int[4]; // in alphabetic order: A, C, G, T
     	String cell_id;
-    	
-    	
-    	// When reading from bam file
-//    	for(GeneticVariant snp : d_dnaGenotypes)
-//    	{
-//    		// do check if variant should be considered: isSNP, isBiallelic, has genotypes for all samples
-//    		if (!snp.isSnp())
-//        		continue;
-//    		
-//    		if (!snp.isBiallelic())
-//        		continue;
-//        
-//        	Allele ref = snp.getRefAllele();
-//        	Allele alt = snp.getAlternativeAlleles().get(0);
-//    		float[][] snpGP = snp.getSampleGenotypeProbilities();
-//
-//    		// Check that all samples have the GP field filled
-//    		boolean allFilled = true;
-//    		for (int samp = 0; samp < d_numbSamples; ++samp)
-//    		{
-//    			if (snpGP[samp][0] + snpGP[samp][1] + snpGP[samp][2] < 0.99)  // allow rounding-off error
-//    			{	
-//    				if (d_dnaGenotypes.getSampleNames()[samp].contains("gonl"))
-//    				{
-//    					float[][] thisGP = ProbabilitiesConvertor.convertCalledAllelesToProbability(snp.getSampleVariants().subList(samp, samp + 1), snp.getVariantAlleles());
-//    					for (int idx = 0; idx < 3; ++idx)
-//    					{
-//    						snpGP[samp][idx] = thisGP[0][idx];
-//    					}
-//    				}
-//    				else
-//    					allFilled = false;
-//    			}
-//    						
-//    		}
-//
-//    		if (!allFilled)
-//    			continue;
-//    		
-//    		// if so, determine reads per cell at variant in bam file
-//    		
-//    		
-//    		// 
-//    	}
-    		
+    	    		
     	
     	// parse line from d_SNPfile, get pos, cell_id and reads for the alleles
     	try (BufferedReader reader = new BufferedReader(new FileReader(d_SNPfile))){
@@ -171,7 +166,7 @@ public class GenoTable
 	    		  	match(cell_id, pos, genoCode);
 	    		  	
 	    		  	++processedlines;
-	    		  	if (processedlines % 50000 == 0)
+	    		  	if (processedlines % 100000 == 0)
 	    		  		System.out.println(processedlines + " lines processed...");
     			}
 
@@ -298,8 +293,12 @@ public class GenoTable
     {
     	System.out.println("Writing table to: " + outputPath);
     	
+    	int doublets = 0;
+ 	    int singlets = 0;
+ 	    int inconclusives = 0;
     	// Make file
-    	try 
+    	
+ 	    try 
     	{
 
   	      File file = new File(outputPath);
@@ -333,28 +332,43 @@ public class GenoTable
     	    	double maxCell = d_genoTable.get(cell_id).getScores()[maxCellAt];
     	    	double max = maxDoub - maxCell;
 
+    	    	
+    	    	
     	    	if (max > d_tVal)  // Doublet
+    	    	{
     	     		writer.println(cell_id + "\t" + maxCellAt + "\t" + getSamp1(combi) + "\t" + getSamp2(combi)+ "\t" + d_alphas[alpha] + "\t" + 
     	     				max + "\t" + maxDoub + "\t" + d_genoTable.get(cell_id).getScores()[getSamp1(combi)] + "\t" + 
     	     				d_genoTable.get(cell_id).getScores()[getSamp2(combi)] + "\t" + d_genoTable.get(cell_id).getNSnps() +"\tDoublet\t" + d_dnaGenotypes.getSampleNames()[getSamp1(combi)] + 
     	     				"," + d_dnaGenotypes.getSampleNames()[getSamp2(combi)]);
+    	     		++doublets;
+    	    	}
     	    	else if (max < -d_tVal)  // Singlet
+    	    	{
     	    		writer.println(cell_id + "\t" + maxCellAt + "\t" + getSamp1(combi) + "\t" + getSamp2(combi)+ "\t" + d_alphas[alpha] + "\t" + 
     	     				max + "\t" + maxDoub + "\t" + d_genoTable.get(cell_id).getScores()[getSamp1(combi)] + "\t" + 
     	     				d_genoTable.get(cell_id).getScores()[getSamp2(combi)] + "\t" + d_genoTable.get(cell_id).getNSnps() + "\tSinglet\t" + d_dnaGenotypes.getSampleNames()[maxCellAt]);
+    	    		++singlets;
+    	    	}
     	    	else  // Inconclusive
+    	    	{
     	    		writer.println( cell_id + "\t" + maxCellAt + "\t" + getSamp1(combi) + "\t" + getSamp2(combi)+ "\t" + d_alphas[alpha] + "\t" + 
     	     				max + "\t" + maxDoub + "\t" + d_genoTable.get(cell_id).getScores()[getSamp1(combi)] + "\t" + 
     	     				d_genoTable.get(cell_id).getScores()[getSamp2(combi)] + "\t" + d_genoTable.get(cell_id).getNSnps() +"\tInconclusive\tNone");
+    	    		++inconclusives;
+    	    	}
    	
     		}
+    	    
     	    writer.close();
     	} 
     	catch (IOException e) 
     	{
     	   System.out.println("No table could be written. Error message:" + e.getMessage());
-    	}	
+    	}
+    	
+    	System.out.println("\nSummary:\n" + singlets + " cell(s) detected as singlet\n" + doublets + " cell(s) detected as doublet\n" + inconclusives + " cell(s) detected as inconclusive\n");
     	System.out.println("Done!\n");
+
     } 
      
  }
