@@ -1,0 +1,3 @@
+[submodule "systemsgenetics"]
+	path = systemsgenetics
+	url = https://github.com/molgenis/systemsgenetics.git

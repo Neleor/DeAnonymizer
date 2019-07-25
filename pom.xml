@@ -18,6 +18,12 @@
     	<artifactId>commons-cli</artifactId>
     	<version>1.4</version>
 	</dependency>
+	<!-- -->
+	<dependency>
+        <groupId>nl.systemsgenetics</groupId>
+        <artifactId>Genotype-IO</artifactId>
+		<version>1.0.6-SNAPSHOT</version>
+    </dependency>
 
   </dependencies> 
   <build>
