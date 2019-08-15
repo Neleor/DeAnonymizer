@@ -1,3 +1,4 @@
+package nl.umcg.genetics.deanonymizer;
 import org.molgenis.genotype.Allele;
 
 public class SNPCompare {
