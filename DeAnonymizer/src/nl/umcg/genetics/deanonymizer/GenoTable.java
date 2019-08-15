@@ -1,17 +1,22 @@
+package nl.umcg.genetics.deanonymizer;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
-import java.io.*;
-import java.nio.file.*;
-import java.util.*;
-
+import java.io.PrintWriter;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.HashMap;
+import java.util.HashSet;
 
 import org.molgenis.genotype.Allele;
-import org.molgenis.genotype.variant.*;
 import org.molgenis.genotype.RandomAccessGenotypeData;
 import org.molgenis.genotype.RandomAccessGenotypeDataReaderFormats;
-import org.molgenis.genotype.sampleFilter.SampleFilterableGenotypeDataDecorator;
 import org.molgenis.genotype.sampleFilter.SampleFilter;
+import org.molgenis.genotype.sampleFilter.SampleFilterableGenotypeDataDecorator;
 import org.molgenis.genotype.sampleFilter.SampleIdIncludeFilter;
 import org.molgenis.genotype.util.ProbabilitiesConvertor;
+import org.molgenis.genotype.variant.GeneticVariant;
 
 
 /**

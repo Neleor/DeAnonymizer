@@ -1,3 +1,4 @@
+package nl.umcg.genetics.deanonymizer;
 public class Scores {
 	
 	private double[] d_scores;
